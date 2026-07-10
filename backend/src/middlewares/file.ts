@@ -1,10 +1,14 @@
 import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import { mkdirSync } from 'fs'
-import { join } from 'path'
+import { basename, join } from 'path'
+import BadRequestError from '../errors/bad-request-error'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
 type FileNameCallback = (error: Error | null, filename: string) => void
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024
+const MAX_FILE_NAME_LENGTH = 120
 
 const storage = multer.diskStorage({
     destination: (
@@ -29,7 +33,13 @@ const storage = multer.diskStorage({
         file: Express.Multer.File,
         cb: FileNameCallback
     ) => {
-        cb(null, file.originalname)
+        const fileName = basename(file.originalname)
+
+        if (!fileName || fileName.length > MAX_FILE_NAME_LENGTH) {
+            return cb(new BadRequestError('Некорректное имя файла'), fileName)
+        }
+
+        return cb(null, fileName)
     },
 })
 
@@ -53,4 +63,11 @@ const fileFilter = (
     return cb(null, true)
 }
 
-export default multer({ storage, fileFilter })
+export default multer({
+    storage,
+    fileFilter,
+    limits: {
+        fileSize: MAX_FILE_SIZE,
+        files: 1,
+    },
+})

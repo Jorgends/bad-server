@@ -4,20 +4,31 @@ import path from 'path'
 
 export default function serveStatic(baseDir: string) {
     return (req: Request, res: Response, next: NextFunction) => {
-        // Определяем полный путь к запрашиваемому файлу
-        const filePath = path.join(baseDir, req.path)
+        const safeBaseDir = path.resolve(baseDir)
+        const filePath = path.resolve(safeBaseDir, `.${req.path}`)
 
-        // Проверяем, существует ли файл
+        if (
+            filePath !== safeBaseDir &&
+            !filePath.startsWith(`${safeBaseDir}${path.sep}`)
+        ) {
+            return next()
+        }
+
         fs.access(filePath, fs.constants.F_OK, (err) => {
             if (err) {
-                // Файл не существует отдаем дальше мидлварам
                 return next()
             }
-            // Файл существует, отправляем его клиенту
-            return res.sendFile(filePath, (err) => {
-                if (err) {
-                    next(err)
+
+            return fs.stat(filePath, (statError, stat) => {
+                if (statError || !stat.isFile()) {
+                    return next()
                 }
+
+                return res.sendFile(filePath, (sendFileError) => {
+                    if (sendFileError) {
+                        next(sendFileError)
+                    }
+                })
             })
         })
     }
