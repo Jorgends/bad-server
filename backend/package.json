@@ -55,5 +55,10 @@
     "sharp": "^0.33.4",
     "unique-slug": "^4.0.0",
     "validator": "^13.12.0"
+  },
+  "overrides": {
+    "csurf": {
+      "cookie": "0.7.2"
+    }
   }
 }
