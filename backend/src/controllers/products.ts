@@ -9,37 +9,46 @@ import Product from '../models/product'
 import movingFile from '../utils/movingFile'
 import sanitizeHtml from '../utils/sanitizeHtml'
 
-const MAX_PAGE_SIZE = 100
+const MAX_PAGE_SIZE = 10;
 
 // GET /product
-const getProducts = async (req: Request, res: Response, next: NextFunction) => {
+const getProducts = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
     try {
-        const { page = '1', limit = '5' } = req.query
+        const { page = '1', limit = '5' } = req.query;
 
         if (typeof page !== 'string' || typeof limit !== 'string') {
-            return next(new BadRequestError('Некорректные параметры пагинации'))
+            return next(new BadRequestError('Некорректные параметры пагинации'));
         }
 
-        const pageNumber = Number(page)
-        const limitNumber = Number(limit)
+        const pageNumber = Number(page);
+        const parsedLimit = Number(limit);
 
-        if (
-            !Number.isInteger(pageNumber) ||
-            pageNumber < 1 ||
-            !Number.isInteger(limitNumber) ||
-            limitNumber < 1 ||
-            limitNumber > MAX_PAGE_SIZE
-        ) {
-            return next(new BadRequestError('Некорректные параметры пагинации'))
+        // Проверяем номер страницы
+        if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+            return next(new BadRequestError('Некорректный номер страницы'));
         }
+
+        // Проверяем, что limit является положительным числом
+        if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+            return next(new BadRequestError('Некорректный размер страницы'));
+        }
+
+        // Если limit больше максимального — просто уменьшаем его
+        const limitNumber = Math.min(parsedLimit, MAX_PAGE_SIZE);
 
         const options = {
             skip: (pageNumber - 1) * limitNumber,
             limit: limitNumber,
-        }
-        const products = await Product.find({}, null, options)
-        const totalProducts = await Product.countDocuments({})
-        const totalPages = Math.ceil(totalProducts / limitNumber)
+        };
+
+        const products = await Product.find({}, null, options);
+        const totalProducts = await Product.countDocuments({});
+        const totalPages = Math.ceil(totalProducts / limitNumber);
+
         return res.send({
             items: products,
             pagination: {
@@ -48,11 +57,11 @@ const getProducts = async (req: Request, res: Response, next: NextFunction) => {
                 currentPage: pageNumber,
                 pageSize: limitNumber,
             },
-        })
+        });
     } catch (err) {
-        return next(err)
+        return next(err);
     }
-}
+};
 
 // POST /product
 const createProduct = async (
