@@ -9,11 +9,20 @@ import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import UnauthorizedError from '../errors/unauthorized-error'
 import User from '../models/user'
+import sanitizeHtml from '../utils/sanitizeHtml'
 
 // POST /auth/login
 const login = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { email, password } = req.body
+        if (
+            typeof email !== 'string' ||
+            typeof password !== 'string' ||
+            !email.trim() ||
+            !password.trim()
+        ) {
+            return next(new BadRequestError('Invalid data'))
+        }
         const user = await User.findUserByCredentials(email, password)
         const accessToken = user.generateAccessToken()
         const refreshToken = await user.generateRefreshToken()
@@ -36,7 +45,21 @@ const login = async (req: Request, res: Response, next: NextFunction) => {
 const register = async (req: Request, res: Response, next: NextFunction) => {
     try {
         const { email, password, name } = req.body
-        const newUser = new User({ email, password, name })
+        if (
+            typeof email !== 'string' ||
+            typeof password !== 'string' ||
+            typeof name !== 'string' ||
+            !email.trim() ||
+            !password.trim() ||
+            !name.trim()
+        ) {
+            return next(new BadRequestError('Invalid data'))
+        }
+        const newUser = new User({
+            email: sanitizeHtml(email),
+            password,
+            name: sanitizeHtml(name),
+        })
         await newUser.save()
         const accessToken = newUser.generateAccessToken()
         const refreshToken = await newUser.generateRefreshToken()
@@ -165,15 +188,13 @@ const refreshAccessToken = async (
 }
 
 const getCurrentUserRoles = async (
-    req: Request,
+    _req: Request,
     res: Response,
     next: NextFunction
 ) => {
     const userId = res.locals.user._id
     try {
-        await User.findById(userId, req.body, {
-            new: true,
-        }).orFail(
+        await User.findById(userId).orFail(
             () =>
                 new NotFoundError(
                     'Пользователь по заданному id отсутствует в базе'
@@ -192,8 +213,33 @@ const updateCurrentUser = async (
 ) => {
     const userId = res.locals.user._id
     try {
-        const updatedUser = await User.findByIdAndUpdate(userId, req.body, {
+        const { name, email, phone } = req.body
+
+        if (
+            (name !== undefined && typeof name !== 'string') ||
+            (email !== undefined && typeof email !== 'string') ||
+            (phone !== undefined && typeof phone !== 'string')
+        ) {
+            return next(new BadRequestError('Invalid data'))
+        }
+
+        const updateData: Record<string, string> = {}
+
+        if (name !== undefined) {
+            updateData.name = sanitizeHtml(name)
+        }
+
+        if (email !== undefined) {
+            updateData.email = sanitizeHtml(email)
+        }
+
+        if (phone !== undefined) {
+            updateData.phone = sanitizeHtml(phone)
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(userId, updateData, {
             new: true,
+            runValidators: true,
         }).orFail(
             () =>
                 new NotFoundError(

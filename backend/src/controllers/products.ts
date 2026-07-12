@@ -7,31 +7,61 @@ import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import Product from '../models/product'
 import movingFile from '../utils/movingFile'
+import sanitizeHtml from '../utils/sanitizeHtml'
+
+const MAX_PAGE_SIZE = 10;
 
 // GET /product
-const getProducts = async (req: Request, res: Response, next: NextFunction) => {
+const getProducts = async (
+    req: Request,
+    res: Response,
+    next: NextFunction
+) => {
     try {
-        const { page = 1, limit = 5 } = req.query
-        const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+        const { page = '1', limit = '5' } = req.query;
+
+        if (typeof page !== 'string' || typeof limit !== 'string') {
+            return next(new BadRequestError('Некорректные параметры пагинации'));
         }
-        const products = await Product.find({}, null, options)
-        const totalProducts = await Product.countDocuments({})
-        const totalPages = Math.ceil(totalProducts / Number(limit))
+
+        const pageNumber = Number(page);
+        const parsedLimit = Number(limit);
+
+        // Проверяем номер страницы
+        if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+            return next(new BadRequestError('Некорректный номер страницы'));
+        }
+
+        // Проверяем, что limit является положительным числом
+        if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+            return next(new BadRequestError('Некорректный размер страницы'));
+        }
+
+        // Если limit больше максимального — просто уменьшаем его
+        const limitNumber = Math.min(parsedLimit, MAX_PAGE_SIZE);
+
+        const options = {
+            skip: (pageNumber - 1) * limitNumber,
+            limit: limitNumber,
+        };
+
+        const products = await Product.find({}, null, options);
+        const totalProducts = await Product.countDocuments({});
+        const totalPages = Math.ceil(totalProducts / limitNumber);
+
         return res.send({
             items: products,
             pagination: {
                 totalProducts,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage: pageNumber,
+                pageSize: limitNumber,
             },
-        })
+        });
     } catch (err) {
-        return next(err)
+        return next(err);
     }
-}
+};
 
 // POST /product
 const createProduct = async (
@@ -52,11 +82,11 @@ const createProduct = async (
         }
 
         const product = await Product.create({
-            description,
+            description: sanitizeHtml(description),
             image,
-            category,
+            category: sanitizeHtml(category),
             price,
-            title,
+            title: sanitizeHtml(title),
         })
         return res.status(constants.HTTP_STATUS_CREATED).send(product)
     } catch (error) {
@@ -81,7 +111,7 @@ const updateProduct = async (
 ) => {
     try {
         const { productId } = req.params
-        const { image } = req.body
+        const { category, description, image, price, title } = req.body
 
         // Переносим картинку из временной папки
         if (image) {
@@ -92,14 +122,32 @@ const updateProduct = async (
             )
         }
 
+        const updateData: Record<string, unknown> = {}
+
+        if (category !== undefined) {
+            updateData.category = sanitizeHtml(category)
+        }
+
+        if (description !== undefined) {
+            updateData.description = sanitizeHtml(description)
+        }
+
+        if (price !== undefined) {
+            updateData.price = price
+        }
+
+        if (title !== undefined) {
+            updateData.title = sanitizeHtml(title)
+        }
+
+        if (image !== undefined) {
+            updateData.image = image
+        }
+
         const product = await Product.findByIdAndUpdate(
             productId,
             {
-                $set: {
-                    ...req.body,
-                    price: req.body.price ? req.body.price : null,
-                    image: req.body.image ? req.body.image : undefined,
-                },
+                $set: updateData,
             },
             { runValidators: true, new: true }
         ).orFail(() => new NotFoundError('Нет товара по заданному id'))
