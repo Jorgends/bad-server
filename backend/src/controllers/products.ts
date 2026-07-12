@@ -41,8 +41,8 @@ const getProducts = async (
         const limitNumber = Math.min(parsedLimit, MAX_PAGE_SIZE);
 
         const options = {
-            skip: (pageNumber - 1) * MAX_PAGE_SIZE,
-            limit: MAX_PAGE_SIZE,
+            skip: (pageNumber - 1) * limitNumber,
+            limit: limitNumber,
         };
 
         const products = await Product.find({}, null, options);
