@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from '../../services/hooks'
 import { selectOrderByNumber } from '../../services/selector'
 import { getCurrentUserOrderByNumber } from '../../services/slice/profile-orders/thunk'
 import { adapterOrderFromServer } from '../../utils/adapterOrderFromServer'
+import DOMPurify from 'dompurify'
 import { Preloader } from '../preloader'
 import styles from './profile.module.scss'
 
@@ -73,7 +74,9 @@ export default function ProfileOrderDetail() {
                         {dataInfo.comment ? (
                             <div
                                 dangerouslySetInnerHTML={{
-                                    __html: dataInfo.comment,
+                                    __html: DOMPurify.sanitize(
+                                        dataInfo.comment
+                                    ),
                                 }}
                             />
                         ) : (
