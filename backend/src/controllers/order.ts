@@ -8,7 +8,7 @@ import User from '../models/user'
 import escapeRegExp from '../utils/escapeRegExp'
 import sanitizeHtml from '../utils/sanitizeHtml'
 
-const MAX_PAGE_SIZE = 100
+const MAX_PAGE_SIZE = 10
 const MAX_SEARCH_LENGTH = 100
 
 // eslint-disable-next-line max-len
@@ -292,17 +292,18 @@ export const getOrdersCurrentUser = async (
         }
 
         const pageNumber = Number(page)
-        const limitNumber = Number(limit)
+        const parsedLimit = Number(limit)
 
-        if (
-            !Number.isInteger(pageNumber) ||
-            pageNumber < 1 ||
-            !Number.isInteger(limitNumber) ||
-            limitNumber < 1 ||
-            limitNumber > MAX_PAGE_SIZE
-        ) {
+        if (!Number.isInteger(pageNumber) || pageNumber < 1) {
             return next(new BadRequestError('Некорректные параметры пагинации'))
         }
+
+        if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
+            return next(new BadRequestError('Некорректные параметры пагинации'))
+        }
+
+        // Ограничиваем, а не выбрасываем ошибку
+        const limitNumber = Math.min(parsedLimit, MAX_PAGE_SIZE)
 
         const options = {
             skip: (pageNumber - 1) * limitNumber,
