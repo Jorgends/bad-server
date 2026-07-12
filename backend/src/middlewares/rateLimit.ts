@@ -1,7 +1,7 @@
 import { NextFunction, Request, Response } from 'express'
 
 const WINDOW_MS = 15 * 60 * 1000
-const MAX_REQUESTS = 100
+const MAX_REQUESTS = 50
 
 type RateLimitEntry = {
     count: number

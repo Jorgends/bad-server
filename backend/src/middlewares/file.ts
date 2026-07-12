@@ -1,7 +1,8 @@
 import { Request, Express } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import { mkdirSync } from 'fs'
-import { basename, join } from 'path'
+import { randomUUID } from 'crypto'
+import { basename, extname, join } from 'path'
 import BadRequestError from '../errors/bad-request-error'
 
 type DestinationCallback = (error: Error | null, destination: string) => void
@@ -39,7 +40,9 @@ const storage = multer.diskStorage({
             return cb(new BadRequestError('Некорректное имя файла'), fileName)
         }
 
-        return cb(null, fileName)
+        const extension = extname(fileName).toLowerCase()
+
+        return cb(null, `${randomUUID()}${extension}`)
     },
 })
 
