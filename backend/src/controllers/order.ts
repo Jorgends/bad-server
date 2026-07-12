@@ -38,17 +38,18 @@ export const getOrders = async (
         }
 
         const pageNumber = Number(page)
-        const limitNumber = Number(limit)
+        const parsedLimit = Number(limit)
 
         if (
             !Number.isInteger(pageNumber) ||
             pageNumber < 1 ||
-            !Number.isInteger(limitNumber) ||
-            limitNumber < 1 ||
-            limitNumber > MAX_PAGE_SIZE
+            !Number.isInteger(parsedLimit) ||
+            parsedLimit < 1
         ) {
             return next(new BadRequestError('Некорректные параметры пагинации'))
         }
+
+        const limitNumber = Math.min(parsedLimit, MAX_PAGE_SIZE)
 
         const filters: FilterQuery<Partial<IOrder>> = {}
 
