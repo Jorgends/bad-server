@@ -1,15 +1,10 @@
 import { NextFunction, Request, Response } from 'express'
-import mongoose, { FilterQuery } from 'mongoose'
+import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
-import BadRequestError from '../errors/bad-request-error'
-import escapeRegExp from '../utils/escapeRegExp'
-import sanitizeHtml from '../utils/sanitizeHtml'
 
-const MAX_PAGE_SIZE = 10
-const MAX_SEARCH_LENGTH = 100
-
+// TODO: Добавить guard admin
 // eslint-disable-next-line max-len
 // Get GET /customers?page=2&limit=5&sort=totalAmount&order=desc&registrationDateFrom=2023-01-01&registrationDateTo=2023-12-31&lastOrderDateFrom=2023-01-01&lastOrderDateTo=2023-12-31&totalAmountFrom=100&totalAmountTo=1000&orderCountFrom=1&orderCountTo=10
 export const getCustomers = async (
@@ -19,8 +14,8 @@ export const getCustomers = async (
 ) => {
     try {
         const {
-            page = '1',
-            limit = '10',
+            page = 1,
+            limit = 10,
             sortField = 'createdAt',
             sortOrder = 'desc',
             registrationDateFrom,
@@ -34,54 +29,17 @@ export const getCustomers = async (
             search,
         } = req.query
 
-        if (typeof page !== 'string' || typeof limit !== 'string') {
-            return next(new BadRequestError('Некорректные параметры пагинации'))
-        }
-
-        const pageNumber = Number(page)
-        const parsedLimit = Number(limit)
-
-        if (
-            !Number.isInteger(pageNumber) ||
-            pageNumber < 1 ||
-            !Number.isInteger(parsedLimit) ||
-            parsedLimit < 1
-        ) {
-            return next(new BadRequestError('Некорректные параметры пагинации'))
-        }
-
-        const limitNumber = Math.min(parsedLimit, MAX_PAGE_SIZE)
-
         const filters: FilterQuery<Partial<IUser>> = {}
 
-        if (registrationDateFrom !== undefined) {
-            if (typeof registrationDateFrom !== 'string') {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
-            const date = new Date(registrationDateFrom)
-
-            if (Number.isNaN(date.getTime())) {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
+        if (registrationDateFrom) {
             filters.createdAt = {
                 ...filters.createdAt,
-                $gte: date,
+                $gte: new Date(registrationDateFrom as string),
             }
         }
 
-        if (registrationDateTo !== undefined) {
-            if (typeof registrationDateTo !== 'string') {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
-            const endOfDay = new Date(registrationDateTo)
-
-            if (Number.isNaN(endOfDay.getTime())) {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
+        if (registrationDateTo) {
+            const endOfDay = new Date(registrationDateTo as string)
             endOfDay.setHours(23, 59, 59, 999)
             filters.createdAt = {
                 ...filters.createdAt,
@@ -89,34 +47,15 @@ export const getCustomers = async (
             }
         }
 
-        if (lastOrderDateFrom !== undefined) {
-            if (typeof lastOrderDateFrom !== 'string') {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
-            const date = new Date(lastOrderDateFrom)
-
-            if (Number.isNaN(date.getTime())) {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
+        if (lastOrderDateFrom) {
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
-                $gte: date,
+                $gte: new Date(lastOrderDateFrom as string),
             }
         }
 
-        if (lastOrderDateTo !== undefined) {
-            if (typeof lastOrderDateTo !== 'string') {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
-            const endOfDay = new Date(lastOrderDateTo)
-
-            if (Number.isNaN(endOfDay.getTime())) {
-                return next(new BadRequestError('Некорректная дата'))
-            }
-
+        if (lastOrderDateTo) {
+            const endOfDay = new Date(lastOrderDateTo as string)
             endOfDay.setHours(23, 59, 59, 999)
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
@@ -124,101 +63,36 @@ export const getCustomers = async (
             }
         }
 
-        if (totalAmountFrom !== undefined) {
-            if (typeof totalAmountFrom !== 'string') {
-                return next(
-                    new BadRequestError('Некорректное значение totalAmountFrom')
-                )
-            }
-
-            const value = Number(totalAmountFrom)
-
-            if (Number.isNaN(value)) {
-                return next(
-                    new BadRequestError('Некорректное значение totalAmountFrom')
-                )
-            }
-
+        if (totalAmountFrom) {
             filters.totalAmount = {
                 ...filters.totalAmount,
-                $gte: value,
+                $gte: Number(totalAmountFrom),
             }
         }
 
-        if (totalAmountTo !== undefined) {
-            if (typeof totalAmountTo !== 'string') {
-                return next(
-                    new BadRequestError('Некорректное значение totalAmountTo')
-                )
-            }
-
-            const value = Number(totalAmountTo)
-
-            if (Number.isNaN(value)) {
-                return next(
-                    new BadRequestError('Некорректное значение totalAmountTo')
-                )
-            }
-
+        if (totalAmountTo) {
             filters.totalAmount = {
                 ...filters.totalAmount,
-                $lte: value,
+                $lte: Number(totalAmountTo),
             }
         }
 
-        if (orderCountFrom !== undefined) {
-            if (typeof orderCountFrom !== 'string') {
-                return next(
-                    new BadRequestError('Некорректное значение orderCountFrom')
-                )
-            }
-
-            const value = Number(orderCountFrom)
-
-            if (!Number.isInteger(value)) {
-                return next(
-                    new BadRequestError('Некорректное значение orderCountFrom')
-                )
-            }
-
+        if (orderCountFrom) {
             filters.orderCount = {
                 ...filters.orderCount,
-                $gte: value,
+                $gte: Number(orderCountFrom),
             }
         }
 
-        if (orderCountTo !== undefined) {
-            if (typeof orderCountTo !== 'string') {
-                return next(
-                    new BadRequestError('Некорректное значение orderCountTo')
-                )
-            }
-
-            const value = Number(orderCountTo)
-
-            if (!Number.isInteger(value)) {
-                return next(
-                    new BadRequestError('Некорректное значение orderCountTo')
-                )
-            }
-
+        if (orderCountTo) {
             filters.orderCount = {
                 ...filters.orderCount,
-                $lte: value,
+                $lte: Number(orderCountTo),
             }
         }
 
-        if (search !== undefined) {
-            if (
-                typeof search !== 'string' ||
-                search.length > MAX_SEARCH_LENGTH
-            ) {
-                return next(
-                    new BadRequestError('Некорректный поисковый запрос')
-                )
-            }
-
-            const searchRegex = new RegExp(escapeRegExp(search), 'i')
+        if (search) {
+            const searchRegex = new RegExp(search as string, 'i')
             const orders = await Order.find(
                 {
                     $or: [{ deliveryAddress: searchRegex }],
@@ -235,27 +109,15 @@ export const getCustomers = async (
         }
 
         const sort: { [key: string]: any } = {}
-        const allowedSortFields = [
-            'createdAt',
-            'lastOrderDate',
-            'totalAmount',
-            'orderCount',
-            'name',
-        ]
 
-        if (
-            typeof sortField === 'string' &&
-            allowedSortFields.includes(sortField)
-        ) {
-            sort[sortField] = sortOrder === 'asc' ? 1 : -1
-        } else {
-            sort.createdAt = -1
+        if (sortField && sortOrder) {
+            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
         }
 
         const options = {
             sort,
-            skip: (pageNumber - 1) * limitNumber,
-            limit: limitNumber,
+            skip: (Number(page) - 1) * Number(limit),
+            limit: Number(limit),
         }
 
         const users = await User.find(filters, null, options).populate([
@@ -275,15 +137,15 @@ export const getCustomers = async (
         ])
 
         const totalUsers = await User.countDocuments(filters)
-        const totalPages = Math.ceil(totalUsers / limitNumber)
+        const totalPages = Math.ceil(totalUsers / Number(limit))
 
         res.status(200).json({
             customers: users,
             pagination: {
                 totalUsers,
                 totalPages,
-                currentPage: pageNumber,
-                pageSize: limitNumber,
+                currentPage: Number(page),
+                pageSize: Number(limit),
             },
         })
     } catch (error) {
@@ -291,6 +153,7 @@ export const getCustomers = async (
     }
 }
 
+// TODO: Добавить guard admin
 // Get /customers/:id
 export const getCustomerById = async (
     req: Request,
@@ -298,27 +161,17 @@ export const getCustomerById = async (
     next: NextFunction
 ) => {
     try {
-        const { id } = req.params
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return next(new BadRequestError('Некорректный id'))
-        }
-
-        const user = await User.findById(id)
-            .populate(['orders', 'lastOrder'])
-            .orFail(
-                () =>
-                    new NotFoundError(
-                        'Пользователь по заданному id отсутствует в базе'
-                    )
-            )
-
+        const user = await User.findById(req.params.id).populate([
+            'orders',
+            'lastOrder',
+        ])
         res.status(200).json(user)
     } catch (error) {
         next(error)
     }
 }
 
+// TODO: Добавить guard admin
 // Patch /customers/:id
 export const updateCustomer = async (
     req: Request,
@@ -326,53 +179,27 @@ export const updateCustomer = async (
     next: NextFunction
 ) => {
     try {
-        const { id } = req.params
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return next(new BadRequestError('Некорректный id'))
-        }
-
-        const { name, email, phone } = req.body
-
-        if (
-            (name !== undefined && typeof name !== 'string') ||
-            (email !== undefined && typeof email !== 'string') ||
-            (phone !== undefined && typeof phone !== 'string')
-        ) {
-            return next(new BadRequestError('Invalid data'))
-        }
-
-        const updateData: Record<string, string> = {}
-
-        if (name !== undefined) {
-            updateData.name = sanitizeHtml(name)
-        }
-
-        if (email !== undefined) {
-            updateData.email = sanitizeHtml(email)
-        }
-
-        if (phone !== undefined) {
-            updateData.phone = sanitizeHtml(phone)
-        }
-
-        const updatedUser = await User.findByIdAndUpdate(id, updateData, {
-            new: true,
-            runValidators: true,
-        })
-            .populate(['orders', 'lastOrder'])
+        const updatedUser = await User.findByIdAndUpdate(
+            req.params.id,
+            req.body,
+            {
+                new: true,
+            }
+        )
             .orFail(
                 () =>
                     new NotFoundError(
                         'Пользователь по заданному id отсутствует в базе'
                     )
             )
+            .populate(['orders', 'lastOrder'])
         res.status(200).json(updatedUser)
     } catch (error) {
         next(error)
     }
 }
 
+// TODO: Добавить guard admin
 // Delete /customers/:id
 export const deleteCustomer = async (
     req: Request,
@@ -380,11 +207,6 @@ export const deleteCustomer = async (
     next: NextFunction
 ) => {
     try {
-        const { id } = req.params
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return next(new BadRequestError('Некорректный id'))
-        }
         const deletedUser = await User.findByIdAndDelete(req.params.id).orFail(
             () =>
                 new NotFoundError(

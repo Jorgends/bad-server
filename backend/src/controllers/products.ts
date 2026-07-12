@@ -7,61 +7,31 @@ import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import Product from '../models/product'
 import movingFile from '../utils/movingFile'
-import sanitizeHtml from '../utils/sanitizeHtml'
-
-const MAX_PAGE_SIZE = 10;
 
 // GET /product
-const getProducts = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-) => {
+const getProducts = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { page = '1', limit = '5' } = req.query;
-
-        if (typeof page !== 'string' || typeof limit !== 'string') {
-            return next(new BadRequestError('Некорректные параметры пагинации'));
-        }
-
-        const pageNumber = Number(page);
-        const parsedLimit = Number(limit);
-
-        // Проверяем номер страницы
-        if (!Number.isInteger(pageNumber) || pageNumber < 1) {
-            return next(new BadRequestError('Некорректный номер страницы'));
-        }
-
-        // Проверяем, что limit является положительным числом
-        if (!Number.isInteger(parsedLimit) || parsedLimit < 1) {
-            return next(new BadRequestError('Некорректный размер страницы'));
-        }
-
-        // Если limit больше максимального — просто уменьшаем его
-        const limitNumber = Math.min(parsedLimit, MAX_PAGE_SIZE);
-
+        const { page = 1, limit = 5 } = req.query
         const options = {
-            skip: (pageNumber - 1) * limitNumber,
-            limit: limitNumber,
-        };
-
-        const products = await Product.find({}, null, options);
-        const totalProducts = await Product.countDocuments({});
-        const totalPages = Math.ceil(totalProducts / limitNumber);
-
+            skip: (Number(page) - 1) * Number(limit),
+            limit: Number(limit),
+        }
+        const products = await Product.find({}, null, options)
+        const totalProducts = await Product.countDocuments({})
+        const totalPages = Math.ceil(totalProducts / Number(limit))
         return res.send({
             items: products,
             pagination: {
                 totalProducts,
                 totalPages,
-                currentPage: pageNumber,
-                pageSize: limitNumber,
+                currentPage: Number(page),
+                pageSize: Number(limit),
             },
-        });
+        })
     } catch (err) {
-        return next(err);
+        return next(err)
     }
-};
+}
 
 // POST /product
 const createProduct = async (
@@ -82,11 +52,11 @@ const createProduct = async (
         }
 
         const product = await Product.create({
-            description: sanitizeHtml(description),
+            description,
             image,
-            category: sanitizeHtml(category),
+            category,
             price,
-            title: sanitizeHtml(title),
+            title,
         })
         return res.status(constants.HTTP_STATUS_CREATED).send(product)
     } catch (error) {
@@ -111,7 +81,7 @@ const updateProduct = async (
 ) => {
     try {
         const { productId } = req.params
-        const { category, description, image, price, title } = req.body
+        const { image } = req.body
 
         // Переносим картинку из временной папки
         if (image) {
@@ -122,32 +92,14 @@ const updateProduct = async (
             )
         }
 
-        const updateData: Record<string, unknown> = {}
-
-        if (category !== undefined) {
-            updateData.category = sanitizeHtml(category)
-        }
-
-        if (description !== undefined) {
-            updateData.description = sanitizeHtml(description)
-        }
-
-        if (price !== undefined) {
-            updateData.price = price
-        }
-
-        if (title !== undefined) {
-            updateData.title = sanitizeHtml(title)
-        }
-
-        if (image !== undefined) {
-            updateData.image = image
-        }
-
         const product = await Product.findByIdAndUpdate(
             productId,
             {
-                $set: updateData,
+                $set: {
+                    ...req.body,
+                    price: req.body.price ? req.body.price : null,
+                    image: req.body.image ? req.body.image : undefined,
+                },
             },
             { runValidators: true, new: true }
         ).orFail(() => new NotFoundError('Нет товара по заданному id'))

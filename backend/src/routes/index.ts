@@ -7,11 +7,9 @@ import customerRouter from './customers'
 import orderRouter from './order'
 import productRouter from './product'
 import uploadRouter from './upload'
-import csrfRoutes from './csrf';
 
 const router = Router()
 
-router.use('/auth/csrf-token', csrfRoutes);
 router.use('/auth', authRouter)
 router.use('/product', productRouter)
 router.use('/order', auth, orderRouter)

@@ -13,7 +13,6 @@ import { ordersActions } from '../../services/slice/orders'
 import { getOrderByNumber } from '../../services/slice/orders/thunk'
 import { adapterOrderFromServer } from '../../utils/adapterOrderFromServer'
 import { Preloader } from '../preloader'
-import DOMPurify from 'dompurify';
 import styles from './admin.module.scss'
 
 const ActionsButton = () => {
@@ -101,11 +100,13 @@ export default function AdminOrderDetail() {
                 label: 'Комментарий к заказу',
                 extraClass: styles.profile__gridRowFullWidth,
                 render: (dataInfo: OrderData) => (
-                    <div
-                        dangerouslySetInnerHTML={{
-                            __html: DOMPurify.sanitize(dataInfo.comment),
-                        }}
-                    />
+                    <>
+                        <div
+                            dangerouslySetInnerHTML={{
+                                __html: dataInfo.comment,
+                            }}
+                        />
+                    </>
                 ),
             },
             {
